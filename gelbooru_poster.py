@@ -164,6 +164,7 @@ def main():
 
     if not os.path.exists("config.json"):
         generate_config(defaults)
+        sys.exit(0)
 
     # If first argument is '--gen-config', generate config.json:
     if len(sys.argv) > 1 and sys.argv[1] == "--gen-config":
