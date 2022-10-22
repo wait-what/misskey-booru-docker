@@ -1,0 +1,7 @@
+[Unit]
+Description=Misskey Gelbooru Image Bot Service
+
+[Service]
+Type=oneshot
+WorkingDirectory=[CHANGE_ME]
+ExecStart=/bin/python [CHANGE_ME]/MisskeyBooruImageBot/gelbooru_poster.py
