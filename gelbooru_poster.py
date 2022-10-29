@@ -30,7 +30,6 @@ class BotInstance:
         self.bot_message = config["bot_message"]
         self.misskey_url = config["misskey_url"]
         self.misskey_token = config["misskey_token"]
-        self.saved_images = config["saved_images"]
         self.max_page_number = config["max_page_number"]
 
     # Get a random image from Gelbooru
@@ -66,7 +65,15 @@ class BotInstance:
 
     # Download and post the image to Misskey
     def post_image(self, image_url, image_rating, log_file):
-        if image_url not in self.saved_images:
+        image_found = False
+        file_presence_check = requests.post(self.misskey_url + "drive/files/find", json = {"name": os.path.split(image_url)[-1], "i": self.misskey_token})
+        if file_presence_check.status_code != 200:
+            image_found = False
+        else:
+            file_presence_json = file_presence_check.json()
+            image_found = len(file_presence_json) > 0
+
+        if not image_found:
             # Submit a /drive/files/upload-from-url request to Misskey
             upload_from_url_request = requests.post(self.misskey_url + "drive/files/upload-from-url", json = {"url": image_url, "isSensitive": image_rating != 'general', "i": self.misskey_token})
             # If error, print error and exit
@@ -115,9 +122,7 @@ class BotInstance:
                 continue
             break
         # Download and post the image to Misskey
-        if self.post_image(image_url, image_rating, log_file):
-            # Add the image to the saved image list
-            self.saved_images.append(image_url)
+        self.post_image(image_url, image_rating, log_file)
 
 def generate_config(defaults):
     if os.path.exists("config.json"):
@@ -131,7 +136,6 @@ def generate_config(defaults):
         'bot_message': defaults['bot_message'],
         'misskey_url': defaults['misskey_url'],
         'misskey_token': defaults['misskey_token'],
-        'saved_images': [],
         'max_page_number': defaults['max_page_number']
     }
 
@@ -195,7 +199,6 @@ def main():
                     bot_instance = BotInstance(cfg_name, cfg_tmp)
                     bot_instance.bot_process(log_file)
                     # Save the saved image list to config.json
-                    config[cfg_name]["saved_images"] = bot_instance.saved_images
                     config[cfg_name]["max_page_number"] = bot_instance.max_page_number
                 
                 # If error, print error and continue
