@@ -43,7 +43,7 @@ class BotInstance:
             gelbooru_tags_exclude = "+" + self.gelbooru_tags_exclude
         else:
             gelbooru_tags_exclude = ""
-        gelbooru_json = requests.get(self.gelbooru_url + self.gelbooru_tags + gelbooru_tags_exclude + "&pid=" + str(page_number)).json()
+        gelbooru_json = requests.get(self.gelbooru_url + self.gelbooru_tags + '+' + gelbooru_tags_exclude + "&pid=" + str(page_number)).json()
         max_pages = gelbooru_json['@attributes']['count'] // 100 + (1 if gelbooru_json['@attributes']['count'] % 100 != 0 else 0)
         # Make sure there are images on the page
         if 'post' not in gelbooru_json:
