@@ -28,9 +28,9 @@ class BotInstance:
         self.gelbooru_tags = config["gelbooru_tags"]
         self.gelbooru_tags_exclude = config["gelbooru_tags_exclude"]
         self.bot_message = config["bot_message"]
+        self.bot_hashtags = config["bot_hashtags"]
         self.misskey_url = config["misskey_url"]
         self.misskey_token = config["misskey_token"]
-        self.saved_images = config["saved_images"]
         self.max_page_number = config["max_page_number"]
 
     # Get a random image from Gelbooru
@@ -44,7 +44,7 @@ class BotInstance:
             gelbooru_tags_exclude = "+" + self.gelbooru_tags_exclude
         else:
             gelbooru_tags_exclude = ""
-        gelbooru_json = requests.get(self.gelbooru_url + self.gelbooru_tags + gelbooru_tags_exclude + "&pid=" + str(page_number)).json()
+        gelbooru_json = requests.get(self.gelbooru_url + self.gelbooru_tags + '+' + gelbooru_tags_exclude + "&pid=" + str(page_number)).json()
         max_pages = gelbooru_json['@attributes']['count'] // 100 + (1 if gelbooru_json['@attributes']['count'] % 100 != 0 else 0)
         # Make sure there are images on the page
         if 'post' not in gelbooru_json:
@@ -66,7 +66,15 @@ class BotInstance:
 
     # Download and post the image to Misskey
     def post_image(self, image_url, image_rating, log_file):
-        if image_url not in self.saved_images:
+        image_found = False
+        file_presence_check = requests.post(self.misskey_url + "drive/files/find", json = {"name": os.path.split(image_url)[-1], "i": self.misskey_token})
+        if file_presence_check.status_code != 200:
+            image_found = False
+        else:
+            file_presence_json = file_presence_check.json()
+            image_found = len(file_presence_json) > 0
+
+        if not image_found:
             # Submit a /drive/files/upload-from-url request to Misskey
             upload_from_url_request = requests.post(self.misskey_url + "drive/files/upload-from-url", json = {"url": image_url, "isSensitive": image_rating != 'general', "i": self.misskey_token})
             # If error, print error and exit
@@ -99,7 +107,10 @@ class BotInstance:
             time.sleep(min(30, (attempts ** 2) / 2))
 
         # Submit a /notes/create request to Misskey
-        create_note_request = requests.post(self.misskey_url + "notes/create", json = {"fileIds": [file_id], "text": "%s\nURL: %s\n" % (self.bot_message, image_url), "i": self.misskey_token})
+        msg = self.bot_message
+        if random.randint(0, 100) < 5:
+            msg += " " + self.bot_hashtags
+        create_note_request = requests.post(self.misskey_url + "notes/create", json = {"fileIds": [file_id], "text": "%s\nURL: %s\n" % (msg, image_url), "i": self.misskey_token})
         # If error, print error and exit
         if create_note_request.status_code != 200:
             print("Error: " + create_note_request.json()["error"]["message"], file=log_file)
@@ -115,9 +126,7 @@ class BotInstance:
                 continue
             break
         # Download and post the image to Misskey
-        if self.post_image(image_url, image_rating, log_file):
-            # Add the image to the saved image list
-            self.saved_images.append(image_url)
+        self.post_image(image_url, image_rating, log_file)
 
 def generate_config(defaults):
     if os.path.exists("config.json"):
@@ -129,9 +138,9 @@ def generate_config(defaults):
         'gelbooru_tags': defaults['gelbooru_tags'],
         'gelbooru_tags_exclude': defaults['gelbooru_tags_exclude'],
         'bot_message': defaults['bot_message'],
+        'bot_hashtags': defaults['bot_hashtags'],
         'misskey_url': defaults['misskey_url'],
         'misskey_token': defaults['misskey_token'],
-        'saved_images': [],
         'max_page_number': defaults['max_page_number']
     }
 
@@ -148,6 +157,7 @@ def generate_defaults():
     config['gelbooru_tags'] = 'rating:safe'
     config['gelbooru_tags_exclude'] = ''
     config['bot_message'] = 'Random image from Gelbooru'
+    config['bot_hashtags'] = '#gelbooru #random'
     config['misskey_url'] = 'https://misskey.example.com/'
     config['misskey_token'] = ''
     config['max_page_number'] = 1000
@@ -195,7 +205,6 @@ def main():
                     bot_instance = BotInstance(cfg_name, cfg_tmp)
                     bot_instance.bot_process(log_file)
                     # Save the saved image list to config.json
-                    config[cfg_name]["saved_images"] = bot_instance.saved_images
                     config[cfg_name]["max_page_number"] = bot_instance.max_page_number
                 
                 # If error, print error and continue
