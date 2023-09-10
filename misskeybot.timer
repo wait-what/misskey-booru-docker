@@ -1,9 +1,0 @@
-[Unit]
-Description=Misskey Gelbooru Image Bot Timer
-
-[Timer]
-OnUnitActiveSec=1800s
-OnBootSec=1800s
-
-[Install]
-WantedBy=timers.target

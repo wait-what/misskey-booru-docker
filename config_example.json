@@ -1,0 +1,11 @@
+{
+    "bot_name": {
+        "gelbooru_tags": "rating:safe",
+        "gelbooru_tags_exclude": "",
+        "bot_message": "Random image from Gelbooru",
+        "bot_hashtags": "#gelbooru #random",
+        "misskey_url": "https://misskey.example.com/",
+        "misskey_token": "",
+        "max_page_number": 1000
+    }
+}

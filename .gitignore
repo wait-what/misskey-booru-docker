@@ -1,5 +1,4 @@
 /config.json
+/config.env
 /defaults.json
 /log.txt
-/max_page_number.txt
-/saved_image_list.txt

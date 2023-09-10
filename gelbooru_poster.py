@@ -1,7 +1,6 @@
 # Script to take a random image with certain tags from Gelbooru and post it to Misskey
 
 import os
-import sys
 import copy
 import requests
 import random
@@ -65,7 +64,7 @@ class BotInstance:
         return image_url, image_rating, max_pages
 
     # Download and post the image to Misskey
-    def post_image(self, image_url, image_rating, log_file):
+    def post_image(self, image_url, image_rating):
         image_found = False
         file_presence_check = requests.post(self.misskey_url + "drive/files/find", json = {"name": os.path.split(image_url)[-1], "i": self.misskey_token})
         if file_presence_check.status_code != 200:
@@ -79,7 +78,7 @@ class BotInstance:
             upload_from_url_request = requests.post(self.misskey_url + "drive/files/upload-from-url", json = {"url": image_url, "isSensitive": image_rating != 'general', "i": self.misskey_token})
             # If error, print error and exit
             if upload_from_url_request.status_code != 204 and upload_from_url_request.status_code != 200:
-                print("Error: " + upload_from_url_request.json()["error"]["message"], file=log_file)
+                print("Error: " + upload_from_url_request.json()["error"]["message"])
                 return False
             # Wait for the image to be uploaded
             time.sleep(1)
@@ -90,7 +89,7 @@ class BotInstance:
             file_id_request = requests.post(self.misskey_url + "drive/files/find", json = {"name": os.path.split(image_url)[-1], "i": self.misskey_token})
             # If error, print error and exit
             if file_id_request.status_code != 200:
-                print("Error: " + file_id_request.json()["error"]["message"], file=log_file)
+                print("Error: " + file_id_request.json()["error"]["message"])
                 return False
             file_id_json = file_id_request.json()
             if len(file_id_json) > 0:
@@ -98,7 +97,7 @@ class BotInstance:
                 break
             
             if attempts > 10:
-                print("Error: Image not uploaded", file=log_file)
+                print("Error: Image not uploaded")
                 return False
                 
             # If the image hasn't been uploaded after 10 attempts, exit
@@ -113,10 +112,10 @@ class BotInstance:
         create_note_request = requests.post(self.misskey_url + "notes/create", json = {"fileIds": [file_id], "text": "%s\nURL: %s\n" % (msg, image_url), "i": self.misskey_token})
         # If error, print error and exit
         if create_note_request.status_code != 200:
-            print("Error: " + create_note_request.json()["error"]["message"], file=log_file)
+            print("Error: " + create_note_request.json()["error"]["message"])
         return True
 
-    def bot_process(self, log_file):
+    def bot_process(self):
         # Get a random image making sure it's not in the saved image list
         while True:
             image_url, image_rating, cur_page_number = self.get_random_image(max_page_number=self.max_page_number)
@@ -126,95 +125,29 @@ class BotInstance:
                 continue
             break
         # Download and post the image to Misskey
-        self.post_image(image_url, image_rating, log_file)
+        self.post_image(image_url, image_rating)
 
-def generate_config(defaults):
-    if os.path.exists("config.json"):
-        with open("config.json", "r") as config_file:
-            config = json.load(config_file)
-    else:
-        config = {}
-    config['bot_name'] = {
-        'gelbooru_tags': defaults['gelbooru_tags'],
-        'gelbooru_tags_exclude': defaults['gelbooru_tags_exclude'],
-        'bot_message': defaults['bot_message'],
-        'bot_hashtags': defaults['bot_hashtags'],
-        'misskey_url': defaults['misskey_url'],
-        'misskey_token': defaults['misskey_token'],
-        'max_page_number': defaults['max_page_number']
-    }
-
-    with open("config.json", "w") as config_file:
-        json.dump(config, config_file, indent=4)
-
-def generate_defaults():
-    if os.path.exists("defaults.json"):
-        with open("defaults.json", "r") as config_file:
-            config = json.load(config_file)
-    else:
-        config = {}
-
-    config['gelbooru_tags'] = 'rating:safe'
-    config['gelbooru_tags_exclude'] = ''
-    config['bot_message'] = 'Random image from Gelbooru'
-    config['bot_hashtags'] = '#gelbooru #random'
-    config['misskey_url'] = 'https://misskey.example.com/'
-    config['misskey_token'] = ''
-    config['max_page_number'] = 1000
-    
-    with open("defaults.json", "w") as config_file:
-        json.dump(config, config_file, indent=4)
 
 # Main function
 def main():
-    if not os.path.exists("defaults.json"):
-        generate_defaults()
-    with open("defaults.json", "r") as config_file:
-        defaults = json.load(config_file)
+    # Load set of configs to run from json config
+    with open("config.json", "r") as config_file:
+        config = json.load(config_file)
 
-    if not os.path.exists("config.json"):
-        generate_config(defaults)
-        sys.exit(0)
+    # Create and run bot instances for each config in config.json
+    for cfg_name in config:
+        cfg_tmp = copy.deepcopy(config[cfg_name])
 
-    # If first argument is '--gen-config', generate config.json:
-    if len(sys.argv) > 1 and sys.argv[1] == "--gen-config":
-        # Generate a config.json entry
-        generate_config(defaults)
-    elif len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Usage: python3 gelbooru-bot.py [--gen-config] [--help]")
-        print("  --gen-config: Add a new bot to the config.json file")
-        print("  --help: Show this help message")
-        print("  No arguments: Run the bot")
-        print("  Note: The values in defaults.json will be used if the values are not set in config.json")
-    else:
-        # Load set of configs to run from json config
-        with open("config.json", "r") as config_file:
-            config = json.load(config_file)
+        try:
+            bot_instance = BotInstance(cfg_name, cfg_tmp)
+            bot_instance.bot_process()
+            # Save the saved image list to config.json
+            config[cfg_name]["max_page_number"] = bot_instance.max_page_number
 
-        # Create and run bot instances for each config in config.json
-        with open('log.txt', 'a') as log_file:
-            for cfg_name in config:
-
-                # Set missing config values to defaults
-                cfg_tmp = copy.deepcopy(config[cfg_name])
-                for key in defaults:
-                    if key not in cfg_tmp:
-                        cfg_tmp[key] = defaults[key]
-
-                try:
-                    bot_instance = BotInstance(cfg_name, cfg_tmp)
-                    bot_instance.bot_process(log_file)
-                    # Save the saved image list to config.json
-                    config[cfg_name]["max_page_number"] = bot_instance.max_page_number
-                
-                # If error, print error and continue
-                except Exception as e:
-                    traceback.print_exc(file=log_file)
-                    continue
-
-        # Save the saved image list to config.json
-        with open("config.json", "w") as config_file:
-            json.dump(config, config_file, indent=4)
+        # If error, print error and continue
+        except Exception as e:
+            traceback.print_exc()
+            continue
 
 # Run main function
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  gelbooru_poster:
+    build: .
+    restart: unless-stopped
+    env_file: ./config.env
+    volumes:
+      - ./config.json:/app/config.json:ro
