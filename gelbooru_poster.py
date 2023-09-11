@@ -78,11 +78,11 @@ class BotInstance:
             upload_from_url_request = requests.post(self.misskey_url + "drive/files/upload-from-url", json = {"url": image_url, "isSensitive": image_rating != 'general', "i": self.misskey_token})
             # If error, print error and exit
             if upload_from_url_request.status_code != 204 and upload_from_url_request.status_code != 200:
-                print("Error: " + upload_from_url_request.json()["error"]["message"])
+                print("Error: " + str(upload_from_url_request.status_code) + " " + upload_from_url_request.text)
                 return False
             # Wait for the image to be uploaded
             time.sleep(1)
-        
+
         attempts = 0
         while True:
             # Get the file ID using the /drive/files/find request
