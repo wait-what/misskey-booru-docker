@@ -1,3 +1,6 @@
+# DEPRECATED 
+Replaced by [wait-what/misskey-booru-rs](https://github.com/wait-what/misskey-booru-rs)
+
 # Misskey Booru Image Bot Docker
 Automatically post images from booru to misskey instances (and forks supporting the misskey api).
 
